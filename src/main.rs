@@ -15,6 +15,8 @@ pub enum MergerError {
     InvalidPattern(#[from] regex::Error),
     #[error("No files found matching the pattern")]
     NoFilesFound,
+    #[error("Failed to remove files after merging")]
+    CleanupError,
 }
 
 pub struct Config {
@@ -49,6 +51,7 @@ impl FileMerger {
         let date_pattern = self.compile_pattern()?;
         let files = self.collect_files(&date_pattern)?;
         self.merge_files(&files)?;
+        self.cleanup_files(&files)?;
         Ok(())
     }
 
@@ -100,6 +103,21 @@ impl FileMerger {
         }
 
         write!(output, "{}", existing_content)?;
+        Ok(())
+    }
+
+    fn cleanup_files(&self, files: &[PathBuf]) -> Result<(), MergerError> {
+        for file_path in files {
+            // Skip the output file if it's in the same directory
+            if file_path.file_name() == Some(self.config.output_filename.as_ref()) {
+                continue;
+            }
+
+            if let Err(e) = fs::remove_file(file_path) {
+                eprintln!("Failed to remove file {}: {}", file_path.display(), e);
+                return Err(MergerError::CleanupError);
+            }
+        }
         Ok(())
     }
 }
