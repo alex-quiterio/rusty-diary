@@ -1,12 +1,67 @@
 [package]
-name = "rusty-diary"
+name = "rusty_diary"
 version = "0.1.0"
 edition = "2021"
 authors = ["alex quiterio"]
+description = "A modular markdown diary system with SQLite persistence"
+license = "MIT"
+repository = "https://github.com/alex-quiterio/rusty_diary"
 
 [dependencies]
-regex = "1.9.1"
+# Core functionality
+rusqlite = { version = "0.29", features = ["bundled", "chrono"] }
+chrono = { version = "0.4", features = ["serde"] }
+parking_lot = "0.11"
+regex = "1.5"
+structopt = "0.3"
+structopt-derive = "0.4"
+
+# Error handling
 thiserror = "1.0"
+anyhow = "1.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Async support for future extensibility
+tokio = { version = "1.0", features = ["full"] }
+
+# File system operations
+walkdir = "2.3"        # For recursive directory traversal
+globset = "0.4"        # For glob pattern matching
+
+# Logging and diagnostics
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
+# Testing utilities
 tempfile = "3.2"
+criterion = "0.5"
+test-log = "0.2"
+fake = { version = "2.4", features = ["chrono"] }
+rstest = "0.18"
+
+# For snapshot testing of markdown processing
+insta = "1.34"
+
+[features]
+default = ["sqlite"]
+sqlite = []
+postgres = []  # Reserved for future use
+mysql = []     # Reserved for future use
+
+[profile.release]
+lto = true           # Enable link-time optimization
+codegen-units = 1    # Optimize for size
+panic = "abort"      # Remove panic unwinding code
+strip = true         # Strip symbols from binary
+
+[profile.dev]
+opt-level = 0        # No optimization for faster compilation
+debug = true         # Full debug info
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

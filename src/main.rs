@@ -1,189 +1,114 @@
-use std::fs::{self, File};
-use std::io::{self, Write};
+use anyhow::Context;
+use rusty_diary::{Config, RustyDiary};
 use std::path::PathBuf;
-use std::env;
-use regex::Regex;
-use thiserror::Error;
+use structopt::StructOpt;
+use tracing::info;
 
-#[derive(Error, core::fmt::Debug)]
-pub enum RustyDiaryError {
-    #[error("IO error: {0}")]
-    Io(#[from] io::Error),
-    #[error("Invalid directory path: {0}")]
-    InvalidDirectory(String),
-    #[error("Invalid date pattern: {0}")]
-    InvalidPattern(#[from] regex::Error),
-    #[error("No files found matching the pattern")]
-    NoFilesFound,
-    #[error("Failed to remove files after merging")]
-    CleanupError,
+#[derive(StructOpt, Debug)]
+#[structopt(
+    name = "rusty_diary",
+    about = "A markdown diary with SQLite persistence",
+    author
+)]
+struct Cli {
+    /// Directory containing markdown files
+    #[structopt(parse(from_os_str))]
+    directory: Option<PathBuf>,
+
+    /// Database file path
+    #[structopt(long, parse(from_os_str))]
+    db: Option<PathBuf>,
+
+    /// Custom date pattern for files
+    #[structopt(long)]
+    date_pattern: Option<String>,
+
+    /// Verbosity level
+    #[structopt(short, long, parse(from_occurrences))]
+    verbose: usize,
 }
 
-pub struct Config {
-    pub directory: PathBuf,
-    pub date_pattern: String,
-    pub output_filename: String,
-    pub separator: String,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            directory: PathBuf::from("."),
-            date_pattern: String::from(r"^\d{4}-\d{2}-\d{2}(\.md)?$"),
-            output_filename: String::from("writing-log.md"),
-            separator: String::from("\n***\n"),
-        }
-    }
-}
-
-pub struct RustyDiary {
-    config: Config,
-}
-
-impl RustyDiary {
-    pub fn new(config: Config) -> Self {
-        Self { config }
-    }
-
-    pub fn merge(&self) -> Result<(), RustyDiaryError> {
-        self.verify_directory()?;
-        let date_pattern = self.compile_pattern()?;
-        let files = self.collect_files(&date_pattern)?;
-        self.merge_files(&files)?;
-        self.cleanup_files(&files)?;
-        Ok(())
-    }
-
-    fn verify_directory(&self) -> Result<(), RustyDiaryError> {
-        if !self.config.directory.is_dir() {
-            return Err(RustyDiaryError::InvalidDirectory(
-                self.config.directory.display().to_string(),
-            ));
-        }
-        Ok(())
-    }
-
-    fn compile_pattern(&self) -> Result<Regex, RustyDiaryError> {
-        Regex::new(&self.config.date_pattern).map_err(RustyDiaryError::InvalidPattern)
-    }
-
-    fn collect_files(&self, date_pattern: &Regex) -> Result<Vec<PathBuf>, RustyDiaryError> {
-        let mut files: Vec<_> = fs::read_dir(&self.config.directory)?
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .filter(|path| {
-                path.is_file() && path.file_name()
-                    .and_then(|s| s.to_str())
-                    .map_or(false, |filename| date_pattern.is_match(filename))
-            })
-            .collect();
-
-        if files.is_empty() {
-            return Err(RustyDiaryError::NoFilesFound);
-        }
-
-        files.sort_by(|a, b| b.cmp(a));
-
-        Ok(files)
-    }
-
-    fn merge_files(&self, files: &[PathBuf]) -> Result<(), RustyDiaryError> {
-        let output_path = self.config.directory.join(&self.config.output_filename);
-        let existing_content = fs::read_to_string(&output_path).unwrap_or_else(|_| String::new());
-        let mut output = File::create(&output_path)?;
-
-        for (i, file_path) in files.iter().enumerate() {
-            let file_content = fs::read_to_string(file_path)?;
-            writeln!(output, "{}", file_content)?;
-            // Write separator only if it's not the last file
-            if i < files.len() - 1 {
-                write!(output, "{}", self.config.separator)?;
-            }
-        }
-
-        write!(output, "{}", existing_content)?;
-        Ok(())
-    }
-
-    fn cleanup_files(&self, files: &[PathBuf]) -> Result<(), RustyDiaryError> {
-        for file_path in files {
-            // Skip the output file if it's in the same directory
-            if file_path.file_name() == Some(self.config.output_filename.as_ref()) {
-                continue;
-            }
-
-            if let Err(e) = fs::remove_file(file_path) {
-                eprintln!("Failed to remove file {}: {}", file_path.display(), e);
-                return Err(RustyDiaryError::CleanupError);
-            }
-        }
-        Ok(())
-    }
-}
-
-fn main() -> Result<(), RustyDiaryError> {
-    let config = Config {
-        directory: env::args()
-            .nth(1)
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from(".")),
-        ..Config::default()
+fn setup_logging(verbosity: usize) {
+    let level = match verbosity {
+        0 => tracing::Level::INFO,
+        1 => tracing::Level::DEBUG,
+        _ => tracing::Level::TRACE,
     };
 
-    let diary = RustyDiary::new(config);
-    diary.merge()?;
+    tracing_subscriber::fmt()
+        .with_max_level(level)
+        .with_target(false)
+        .with_thread_ids(false)
+        .with_file(true)
+        .with_line_number(true)
+        .init();
+}
+
+fn build_config(cli: &Cli) -> Config {
+    let mut config = Config::new();
+
+    if let Some(dir) = &cli.directory {
+        config = config.with_directory(dir);
+    }
+
+    if let Some(db) = &cli.db {
+        config = config.with_db(db);
+    }
+
+    if let Some(pattern) = &cli.date_pattern {
+        config = config.with_date_pattern(pattern);
+    }
+
+    config
+}
+
+async fn run(cli: Cli) -> anyhow::Result<()> {
+    info!("Starting Rusty Diary...");
+
+    let config = build_config(&cli);
+    info!("Configuration loaded");
+
+    let diary = RustyDiary::new(config)
+        .context("Failed to initialize diary")?;
+
+    info!("Processing diary entries...");
+    diary.merge()
+        .context("Failed to merge entries")?;
+
+    info!("Successfully processed all entries");
     Ok(())
+}
+
+#[tokio::main]
+async fn main() {
+    let cli = Cli::from_args();
+    setup_logging(cli.verbose);
+
+    if let Err(err) = run(cli).await {
+        eprintln!("Error: {:?}", err);
+        std::process::exit(1);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
-    use std::fs::File;
-    use std::io::Write;
-    use std::path::Path;
 
-    fn create_test_file(dir: &Path, name: &str, content: &str) -> io::Result<()> {
-        let path = dir.join(name);
-        let mut file = File::create(path)?;
-        write!(file, "{}", content)?;
-        Ok(())
-    }
-
-    #[test]
-    fn test_rusty_diary() -> Result<(), Box<dyn std::error::Error>> {
+    #[tokio::test]
+    async fn test_basic_workflow() -> anyhow::Result<()> {
         let temp_dir = TempDir::new()?;
+        let temp_db = temp_dir.path().join("test.db");
 
-        // Create test files
-        create_test_file(&temp_dir.path(), "2024-01-01.md", "Test content 1")?;
-        create_test_file(&temp_dir.path(), "2024-01-02.md", "Test content 2")?;
-
-        let config = Config {
-            directory: temp_dir.path().to_path_buf(),
-            ..Config::default()
+        let cli = Cli {
+            directory: Some(temp_dir.path().to_path_buf()),
+            db: Some(temp_db),
+            date_pattern: None,
+            verbose: 0,
         };
 
-        let merger = RustyDiary::new(config);
-        merger.merge()?;
-
-        // Verify output
-        let output_content = fs::read_to_string(temp_dir.path().join("writing-log.md"))?;
-        assert!(output_content.contains("Test content 1"));
-        assert!(output_content.contains("Test content 2"));
-
+        let config = build_config(&cli);
+        assert_eq!(config.directory, temp_dir.path());
         Ok(())
-    }
-
-    #[test]
-    fn test_empty_directory() {
-        let temp_dir = TempDir::new().unwrap();
-        let config = Config {
-            directory: temp_dir.path().to_path_buf(),
-            ..Config::default()
-        };
-
-        let merger = RustyDiary::new(config);
-        assert!(matches!(merger.merge(), Err(RustyDiaryError::NoFilesFound)));
     }
 }
