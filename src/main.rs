@@ -6,7 +6,7 @@ use regex::Regex;
 use thiserror::Error;
 
 #[derive(Error, core::fmt::Debug)]
-pub enum MergerError {
+pub enum RustyDiaryError {
     #[error("IO error: {0}")]
     Io(#[from] io::Error),
     #[error("Invalid directory path: {0}")]
@@ -37,16 +37,16 @@ impl Default for Config {
     }
 }
 
-pub struct FileMerger {
+pub struct RustyDiary {
     config: Config,
 }
 
-impl FileMerger {
+impl RustyDiary {
     pub fn new(config: Config) -> Self {
         Self { config }
     }
 
-    pub fn run(&self) -> Result<(), MergerError> {
+    pub fn merge(&self) -> Result<(), RustyDiaryError> {
         self.verify_directory()?;
         let date_pattern = self.compile_pattern()?;
         let files = self.collect_files(&date_pattern)?;
@@ -55,20 +55,20 @@ impl FileMerger {
         Ok(())
     }
 
-    fn verify_directory(&self) -> Result<(), MergerError> {
+    fn verify_directory(&self) -> Result<(), RustyDiaryError> {
         if !self.config.directory.is_dir() {
-            return Err(MergerError::InvalidDirectory(
+            return Err(RustyDiaryError::InvalidDirectory(
                 self.config.directory.display().to_string(),
             ));
         }
         Ok(())
     }
 
-    fn compile_pattern(&self) -> Result<Regex, MergerError> {
-        Regex::new(&self.config.date_pattern).map_err(MergerError::InvalidPattern)
+    fn compile_pattern(&self) -> Result<Regex, RustyDiaryError> {
+        Regex::new(&self.config.date_pattern).map_err(RustyDiaryError::InvalidPattern)
     }
 
-    fn collect_files(&self, date_pattern: &Regex) -> Result<Vec<PathBuf>, MergerError> {
+    fn collect_files(&self, date_pattern: &Regex) -> Result<Vec<PathBuf>, RustyDiaryError> {
         let mut files: Vec<_> = fs::read_dir(&self.config.directory)?
             .filter_map(Result::ok)
             .map(|entry| entry.path())
@@ -80,7 +80,7 @@ impl FileMerger {
             .collect();
 
         if files.is_empty() {
-            return Err(MergerError::NoFilesFound);
+            return Err(RustyDiaryError::NoFilesFound);
         }
 
         files.sort_by(|a, b| b.cmp(a));
@@ -88,7 +88,7 @@ impl FileMerger {
         Ok(files)
     }
 
-    fn merge_files(&self, files: &[PathBuf]) -> Result<(), MergerError> {
+    fn merge_files(&self, files: &[PathBuf]) -> Result<(), RustyDiaryError> {
         let output_path = self.config.directory.join(&self.config.output_filename);
         let existing_content = fs::read_to_string(&output_path).unwrap_or_else(|_| String::new());
         let mut output = File::create(&output_path)?;
@@ -106,7 +106,7 @@ impl FileMerger {
         Ok(())
     }
 
-    fn cleanup_files(&self, files: &[PathBuf]) -> Result<(), MergerError> {
+    fn cleanup_files(&self, files: &[PathBuf]) -> Result<(), RustyDiaryError> {
         for file_path in files {
             // Skip the output file if it's in the same directory
             if file_path.file_name() == Some(self.config.output_filename.as_ref()) {
@@ -115,14 +115,14 @@ impl FileMerger {
 
             if let Err(e) = fs::remove_file(file_path) {
                 eprintln!("Failed to remove file {}: {}", file_path.display(), e);
-                return Err(MergerError::CleanupError);
+                return Err(RustyDiaryError::CleanupError);
             }
         }
         Ok(())
     }
 }
 
-fn main() -> Result<(), MergerError> {
+fn main() -> Result<(), RustyDiaryError> {
     let config = Config {
         directory: env::args()
             .nth(1)
@@ -131,8 +131,8 @@ fn main() -> Result<(), MergerError> {
         ..Config::default()
     };
 
-    let merger = FileMerger::new(config);
-    merger.run()?;
+    let diary = RustyDiary::new(config);
+    diary.merge()?;
     Ok(())
 }
 
@@ -152,7 +152,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_merger() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_rusty_diary() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = TempDir::new()?;
 
         // Create test files
@@ -164,8 +164,8 @@ mod tests {
             ..Config::default()
         };
 
-        let merger = FileMerger::new(config);
-        merger.run()?;
+        let merger = RustyDiary::new(config);
+        merger.merge()?;
 
         // Verify output
         let output_content = fs::read_to_string(temp_dir.path().join("writing-log.md"))?;
@@ -183,7 +183,7 @@ mod tests {
             ..Config::default()
         };
 
-        let merger = FileMerger::new(config);
-        assert!(matches!(merger.run(), Err(MergerError::NoFilesFound)));
+        let merger = RustyDiary::new(config);
+        assert!(matches!(merger.merge(), Err(RustyDiaryError::NoFilesFound)));
     }
 }
