@@ -4,8 +4,8 @@ use std::path::PathBuf;
 pub struct Config {
     pub directory: PathBuf,
     pub date_pattern: String,
+    pub output_file_prefix: String,
     pub db_path: PathBuf,
-    pub retention_days: Option<u32>, // How long memories persist
 }
 
 impl Default for Config {
@@ -14,7 +14,7 @@ impl Default for Config {
             directory: PathBuf::from("."),
             date_pattern: String::from(r"^(\d{4}-\d{2}-\d{2})(\.md)?$"),
             db_path: PathBuf::from("diary.db"),
-            retention_days: None,
+            output_file_prefix: String::from("rusty-diary-log"),
         }
     }
 }
@@ -36,6 +36,11 @@ impl Config {
 
     pub fn with_date_pattern(mut self, pattern: &str) -> Self {
         self.date_pattern = pattern.to_string();
+        self
+    }
+
+    pub fn with_output_file_name(mut self, name: &str) -> Self {
+        self.output_file_prefix = name.to_string();
         self
     }
 }

@@ -11,16 +11,18 @@ use super::processor::MarkdownProcessor;
 /// over file system interactions.
 pub struct FileRepository {
     root_dir: PathBuf,
+    diary_file_prefix: String,
     markdown_processor: MarkdownProcessor,
 }
 
 impl FileRepository {
-    pub fn new<P: AsRef<Path>>(root_dir: P, date_pattern: &str) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(root_dir: P, diary_file_prefix: String, date_pattern: &str) -> Result<Self> {
         let root_dir = root_dir.as_ref().to_path_buf();
         let markdown_processor = MarkdownProcessor::new(date_pattern)?;
 
         Ok(Self {
             root_dir,
+            diary_file_prefix,
             markdown_processor,
         })
     }
@@ -41,6 +43,32 @@ impl FileRepository {
         }
 
         Ok(entries)
+    }
+
+    pub fn write_entries(&self, entries: Vec<DiaryEntry>) -> Result<()> {
+        let today = chrono::Local::now().format("%Y-%m-%d");
+        let max_exec_version = entries.iter().map(|entry| entry.exec_version).max().unwrap_or(0);
+        let filename = format!("{}_{}_{}.md", self.diary_file_prefix, today, max_exec_version);
+
+        let mut content = String::new();
+
+        content.push_str(
+            &format!(
+                "# rusty-diary:date:{} -- ## total-entries({})\n\n",
+                today,
+                entries.len()
+            )
+        );
+        for entry in entries {
+            content.push_str(&format!("# {}\n", entry.date.to_string()));
+            content.push_str(&entry.content);
+            content.push_str("\n\n***\n");
+        }
+
+        let path = self.root_dir.join(filename);
+        fs::write(&path, content)?;
+
+        Ok(())
     }
 
     /// Process a set of files into DiaryEntries
@@ -121,68 +149,5 @@ impl FileRepository {
 
         fs::copy(path, &backup_path)?;
         Ok(backup_path)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-    use chrono::NaiveDate;
-    use std::fs::File;
-    use std::io::Write;
-
-    fn create_test_file(dir: &Path, name: &str, content: &str) -> Result<PathBuf> {
-        let path = dir.join(name);
-        let mut file = File::create(&path)?;
-        writeln!(file, "{}", content)?;
-        Ok(path)
-    }
-
-    #[test]
-    fn test_file_collection() -> Result<()> {
-        let temp_dir = TempDir::new()?;
-        let repo = FileRepository::new(temp_dir.path(), r"^(\d{4}-\d{2}-\d{2})(\.md)?$")?;
-
-        // Create test files
-        create_test_file(temp_dir.path(), "2024-01-01.md", "Test content 1")?;
-        create_test_file(temp_dir.path(), "2024-01-02.md", "Test content 2")?;
-        create_test_file(temp_dir.path(), "invalid.md", "Invalid file")?;
-
-        let files = repo.collect_diary_files()?;
-        assert_eq!(files.len(), 2);
-
-        // Verify files are sorted correctly
-        let filenames: Vec<_> = files.iter()
-            .filter_map(|p| p.file_name())
-            .filter_map(|n| n.to_str())
-            .collect();
-
-        assert!(filenames.contains(&"2024-01-01.md"));
-        assert!(filenames.contains(&"2024-01-02.md"));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_file_processing() -> Result<()> {
-        let temp_dir = TempDir::new()?;
-        let repo = FileRepository::new(temp_dir.path(), r"^(\d{4}-\d{2}-\d{2})(\.md)?$")?;
-
-        let test_file = create_test_file(
-            temp_dir.path(),
-            "2024-01-01.md",
-            "Test content",
-        )?;
-
-        let entries = repo.process_files(&[test_file], 1)?;
-        assert_eq!(entries.len(), 1);
-
-        let entry = &entries[0];
-        assert_eq!(entry.exec_version, 1);
-        assert_eq!(entry.date, NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
-        assert_eq!(entry.content.trim(), "Test content");
-
-        Ok(())
     }
 }

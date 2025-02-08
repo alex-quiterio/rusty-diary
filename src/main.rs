@@ -72,8 +72,10 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
         .context("Failed to initialize diary")?;
 
     info!("Processing diary entries...");
-    diary.merge()
-        .context("Failed to merge entries")?;
+    let (start_date, end_date) = diary.synchronize()
+        .context("Failed to synchronize new entries")?;
+
+    diary.write_journal(start_date, end_date).context("Failed to write journal")?;
 
     info!("Successfully processed all entries");
     Ok(())

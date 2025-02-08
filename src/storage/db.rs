@@ -87,7 +87,7 @@ impl DiaryRepository {
                 exec_version, date, content, created_at, updated_at
              FROM diary_entries
              WHERE date BETWEEN ?1 AND ?2
-             ORDER BY date DESC"
+             ORDER BY date DESC, exec_version DESC"
         )?;
 
         let entries = stmt.query_map(
