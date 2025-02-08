@@ -2,8 +2,6 @@ use chrono::{NaiveDate, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-
-
 pub struct DiaryEntry {
     pub exec_version: i64,
     pub date: NaiveDate,
@@ -27,7 +25,7 @@ impl DiaryEntry {
             date,
             content,
             created_at: now,
-            updated_at: None,
+            updated_at: Some(now),
         }
     }
 

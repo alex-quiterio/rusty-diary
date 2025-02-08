@@ -47,6 +47,14 @@ impl StorageManager {
         self.repository.get_entries_by_date_range(start_date, end_date)
     }
 
+    /// Retrieves entries within a date range
+    pub fn get_entries_by_exec_version(
+        &self,
+        exec_version: i64,
+    ) -> Result<Vec<DiaryEntry>> {
+        self.repository.get_entries_by_exec_version(exec_version)
+    }
+
     /// Retrieves metadata for all entries
     pub fn get_metadata(&self) -> Result<Vec<EntryMetadata>> {
         self.repository.get_metadata()
@@ -64,25 +72,6 @@ impl StorageManager {
     }
 }
 
-/// Represents a database transaction
-/// Provides RAII-style transaction management
-pub struct Transaction<'a> {
-    inner: rusqlite::Transaction<'a>,
-}
-
-impl<'a> Transaction<'a> {
-    /// Commits the transaction
-    pub fn commit(self) -> Result<()> {
-        self.inner.commit()?;
-        Ok(())
-    }
-
-    /// Rolls back the transaction
-    pub fn rollback(self) -> Result<()> {
-        self.inner.rollback()?;
-        Ok(())
-    }
-}
 
 // Re-export essential types for convenience
 pub use self::db::DiaryRepository;

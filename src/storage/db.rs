@@ -43,7 +43,6 @@ const MIGRATIONS: &[&str] = &[
 /// Follows the Repository pattern to provide a clean persistence abstraction
 pub struct DiaryRepository {
     conn: Arc<RwLock<Connection>>,
-    version: i32,
 }
 
 impl DiaryRepository {
@@ -55,7 +54,6 @@ impl DiaryRepository {
 
         let repo = Self {
             conn: Arc::new(RwLock::new(conn)),
-            version: MIGRATIONS.len() as i32,
         };
 
         repo.migrate()?;
@@ -66,6 +64,8 @@ impl DiaryRepository {
     pub fn store_batch(&self, entries: Vec<DiaryEntry>) -> Result<()> {
         let mut conn = self.conn.write();
         let tx = conn.transaction()?;
+
+        println!("Storing batch of entries: {:#?}", entries);
 
         for entry in entries {
             self.store_entry_internal(&tx, &entry)?;
@@ -99,6 +99,29 @@ impl DiaryRepository {
             .map_err(RustyDiaryError::from)
     }
 
+    /// Retrieves entries within a date range
+    pub fn get_entries_by_exec_version(
+        &self,
+        exec_version: i64,
+    ) -> Result<Vec<DiaryEntry>> {
+        let conn = self.conn.read();
+        let mut stmt = conn.prepare(
+            "SELECT
+                exec_version, date, content, created_at, updated_at
+             FROM diary_entries
+             WHERE exec_version = :exec_version
+             ORDER BY date DESC"
+        )?;
+
+        let entries = stmt.query_map(
+            &[(":exec_version", &exec_version)],
+            |row| self.map_row_to_entry(row)
+        )?;
+
+        entries.collect::<SqlResult<Vec<_>>>()
+            .map_err(RustyDiaryError::from)
+    }
+
     /// Gets the latest execution version
     pub fn get_latest_exec_version(&self) -> Result<i64> {
         self.conn.read()
@@ -122,7 +145,7 @@ impl DiaryRepository {
              JOIN entry_metadata m ON
                 e.exec_version = m.exec_version AND
                 e.date = m.date
-             ORDER BY e.date DESC"
+             ORDER BY e.date DESC AND e.exec_version DESC"
         )?;
 
         let metadata = stmt.query_map([], |row| {
@@ -209,29 +232,10 @@ impl DiaryRepository {
     fn map_row_to_entry(&self, row: &rusqlite::Row) -> SqlResult<DiaryEntry> {
         Ok(DiaryEntry {
             exec_version: row.get(0)?,
-            date: NaiveDate::parse_from_str(&row.get::<_, String>(1)?, "%Y-%m-%d")
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                    0,
-                    rusqlite::types::Type::Text,
-                    Box::new(e),
-                ))?,
+            date: row.get(1)?,
             content: row.get(2)?,
-            created_at: NaiveDateTime::parse_from_str(
-                &row.get::<_, String>(3)?,
-                "%Y-%m-%d %H:%M:%S",
-            ).map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                0,
-                rusqlite::types::Type::Text,
-                Box::new(e),
-            ))?,
-            updated_at: row.get::<_, Option<String>>(4)?
-                .map(|dt| NaiveDateTime::parse_from_str(&dt, "%Y-%m-%d %H:%M:%S"))
-                .transpose()
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                    0,
-                    rusqlite::types::Type::Text,
-                    Box::new(e),
-                ))?,
+            created_at: row.get(3)?,
+            updated_at: row.get(4)?,
         })
     }
 }
@@ -240,17 +244,6 @@ impl DiaryRepository {
 mod tests {
     use super::*;
     use tempfile::TempDir;
-
-    #[test]
-    fn test_repository_initialization() -> Result<()> {
-        let temp_dir = TempDir::new()?;
-        let db_path = temp_dir.path().join("test.db");
-
-        let repo = DiaryRepository::new(&db_path)?;
-        assert_eq!(repo.version, MIGRATIONS.len() as i32);
-
-        Ok(())
-    }
 
     #[test]
     fn test_entry_lifecycle() -> Result<()> {
