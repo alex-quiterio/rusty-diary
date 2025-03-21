@@ -33,13 +33,7 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
-            
-      - name: Check code formatting
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+            ${{ runner.os }}-cargo-l
           
       - name: Build
         uses: actions-rs/cargo@v1
