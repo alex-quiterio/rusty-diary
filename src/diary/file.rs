@@ -60,7 +60,7 @@ impl FileRepository {
             )
         );
         for entry in entries {
-            content.push_str(&format!("# {}\n", entry.date.to_string()));
+            content.push_str(&format!("## {}\n", entry.date.to_string()));
             content.push_str(&entry.content);
             content.push_str("\n\n***\n");
         }
