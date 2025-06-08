@@ -54,13 +54,19 @@ impl FileRepository {
 
         content.push_str(
             &format!(
-                "# rusty-diary:date:{} -- ## total-entries({})\n\n",
-                today,
+                "---\nmetadata\n- rusty-diary:date-range {} to {}\n",
+                entries.last().map_or("unknown".to_string(), |e| e.date.to_string()),
+                entries.first().map_or("unknown".to_string(), |e| e.date.to_string())
+            )
+        );
+        content.push_str(
+            &format!(
+                "- rusty-diary:total-entries({})\n---\n",
                 entries.len()
             )
         );
         for entry in entries {
-            content.push_str(&format!("## {}\n", entry.date.to_string()));
+            content.push_str(&format!("# {}\n", entry.date.to_string()));
             content.push_str(&entry.content);
             content.push_str("\n\n***\n");
         }

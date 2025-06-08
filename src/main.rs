@@ -66,7 +66,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
     info!("Starting Rusty Diary...");
 
     let config = build_config(&cli);
-    info!("Configuration loaded");
+    info!("Configuration loaded from CLI: {:?}", config);
 
     let diary = RustyDiary::new(config)
         .context("Failed to initialize diary")?;
@@ -75,6 +75,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
     let (start_date, end_date) = diary.synchronize()
         .context("Failed to synchronize new entries")?;
 
+    info!("Writing journal entries from {} to {}", start_date, end_date);
     diary.write_journal(start_date, end_date).context("Failed to write journal")?;
 
     info!("Successfully processed all entries");

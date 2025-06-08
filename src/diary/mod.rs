@@ -36,9 +36,11 @@ impl RustyDiary {
         let exec_version = self.storage.latest_exec_version()? + 1;
 
         // Process files into domain entries
-        let file_entries = self.file_repo.process_files(&files, exec_version)?;
-        let start_date = file_entries.last().unwrap().date;
-        let end_date = file_entries.first().unwrap().date;
+        let mut file_entries = self.file_repo.process_files(&files, exec_version)?;
+        // sort entries by date
+        file_entries.sort_by_key(|entry| entry.date);
+        let end_date = file_entries.last().unwrap().date;
+        let start_date = file_entries.first().unwrap().date;
 
         // Fetch all stored entries
         let stored_entries = self.storage.entries_by_date_range(
