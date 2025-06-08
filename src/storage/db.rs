@@ -1,5 +1,5 @@
 use rusqlite::{Connection, Transaction, params, Result as SqlResult};
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{NaiveDate};
 use std::path::Path;
 use std::sync::Arc;
 use parking_lot::RwLock;
@@ -145,7 +145,7 @@ impl DiaryRepository {
              JOIN entry_metadata m ON
                 e.exec_version = m.exec_version AND
                 e.date = m.date
-             ORDER BY e.date DESC AND e.exec_version DESC"
+             ORDER BY 1,3 DESC"
         )?;
 
         let metadata = stmt.query_map([], |row| {

@@ -21,7 +21,7 @@ pub struct EntryMetadata {
 impl DiaryEntry {
     pub fn new(exec_version: i64, date: NaiveDate, content: String) -> Self {
         let now = chrono::Local::now().naive_local();
-        let content = content.lines().skip(1).collect::<Vec<&str>>().join("\n");
+        let content = content.lines().collect::<Vec<&str>>().join("\n");
         Self {
             exec_version,
             date,

@@ -81,9 +81,6 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    fn create_test_entry(exec_version: i64, date: NaiveDate, content: &str) -> DiaryEntry {
-        DiaryEntry::new(exec_version, date, content.to_string())
-    }
 
     #[test]
     fn test_storage_manager() -> Result<()> {
@@ -94,7 +91,7 @@ mod tests {
 
         // Test storing and retrieving entries
         let test_date = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
-        let entry = create_test_entry(1, test_date, "Test content");
+        let entry = DiaryEntry::new(1, test_date, "Test content".to_string());
 
         manager.store_entries(vec![entry])?;
 
