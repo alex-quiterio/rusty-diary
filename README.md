@@ -70,3 +70,9 @@ let config = Config {
 ### Dependencies
 
 - `regex`: For pattern
+
+
+### Future ideas
+
+- Feed the chronological data to a LLM to generate summaries or insights.
+- Add support for different date formats.
