@@ -13,7 +13,7 @@ impl Default for Config {
         Self {
             directory: PathBuf::from("."),
             date_pattern: String::from(r"^(\d{4}-\d{2}-\d{2})(\.md)?$"),
-            db_path: PathBuf::from("diary.db"),
+            db_path: PathBuf::from("$HOME/.config/rusty-diary.db"),
             output_file_prefix: String::from("rusty-diary-log"),
         }
     }
