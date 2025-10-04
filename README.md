@@ -31,7 +31,24 @@ The compiled binary will be available in `target/release/rusty-diary`.
 
 Basic usage (current directory):
 ```bash
-rusty-diary
+rusty-diary -h
+
+A markdown diary with SQLite persistence
+
+USAGE:
+    rusty_diary [FLAGS] [OPTIONS] [directory]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+    -v, --verbose    Verbosity level
+
+OPTIONS:
+        --date-pattern <date-pattern>    Custom date pattern for files
+        --db <db>                        Database file path
+
+ARGS:
+    <directory>    Directory containing markdown files
 ```
 
 Specify a different directory:
