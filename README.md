@@ -1,5 +1,7 @@
 # RustyDiary 📝
 
+[Cranes.io](https://crates.io/crates/rusty_diary)
+
 RustyDiary is a Rust utility that helps you merge dated Markdown files into a single chronological log. It's perfect for combining daily notes, journal entries, or any date-stamped Markdown files.
 
 ## Features
