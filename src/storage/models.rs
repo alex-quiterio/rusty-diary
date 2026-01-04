@@ -23,7 +23,7 @@ impl DiaryEntry {
     pub fn new(exec_version: i64, date: NaiveDate, content: String) -> Self {
         let now = chrono::Local::now().naive_local();
         let metadata_pattern = Regex::new(
-            r"(?s)\A---\s*(?:.*\n)*?tags:\s*(?:.*\n)*?date:\s*[^\n]+\n(?:.*\n)*?---\s*"
+            r"(?s)\A---\s*(?:.*\n)*?tags:\s*(?:.*\n)*?(?:date:\s*[^\n]+\n)?(?:.*\n)*?---\s*"
         ).unwrap();
 
         let stripped_content = metadata_pattern.replace(&content, "").to_string();
