@@ -1,6 +1,6 @@
 [package]
 name = "rusty_diary"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 authors = ["alex quiterio"]
 description = "A modular markdown diary system with SQLite persistence"
